@@ -434,6 +434,34 @@ optimize_portfolio <- function(baseDir,
     n_hist <- nrow(unit_R)
     n_strat <- ncol(unit_R)
 
+    # Get asset names (strategies + ETFs)
+    asset_names <- colnames(unit_R)
+    if (is.null(asset_names)) {
+        # Build names from strategies and ETFs
+        n_strategies <- length(base_alloc)
+        asset_names <- character(n_strat)
+
+        if (n_strategies > 0) {
+            asset_names[1:n_strategies] <- names(base_alloc)
+        }
+
+        # Add ETF names
+        if (n_strat > n_strategies) {
+            sma_syms <- parse_symbols(etf_sma_symbols)
+            buyhold_syms <- parse_symbols(etf_buyhold_symbols)
+
+            etf_names <- character(0)
+            if (!is.null(sma_syms)) {
+                etf_names <- c(etf_names, paste0(sma_syms, "_SMA150"))
+            }
+            if (!is.null(buyhold_syms)) {
+                etf_names <- c(etf_names, paste0(buyhold_syms, "_BH"))
+            }
+
+            asset_names[(n_strategies + 1):n_strat] <- etf_names
+        }
+    }
+
     # Determine how many strategies vs ETFs we have
     n_strategies <- length(base_alloc)
     n_etfs <- n_strat - n_strategies
@@ -444,6 +472,9 @@ optimize_portfolio <- function(baseDir,
     } else {
         combined_max_alloc <- max_alloc
     }
+
+    # Add names to combined_max_alloc
+    names(combined_max_alloc) <- asset_names
 
     stopifnot(length(combined_max_alloc) == n_strat)
 
@@ -491,6 +522,9 @@ optimize_portfolio <- function(baseDir,
         w_best <- w_best * (total_max / sum(w_best))
     }
 
+    # Add names to weights
+    names(w_best) <- asset_names
+
     if (verbose) cat("Running final high-precision Monte Carlo...\n")
     if (!is.null(progress_callback)) progress_callback("Running final Monte Carlo...")
 
@@ -511,11 +545,16 @@ optimize_portfolio <- function(baseDir,
 
     list(
         weights_optimal = w_best,
-        q25_CAGR        = final_res$q25_CAGR,
-        q95_MaxDD       = final_res$q95_MaxDD,
-        cagrs_all       = final_res$cagrs_all,
-        maxdd_all       = final_res$maxdd_all,
-        psoptim_raw     = opt
+        q25_CAGR = final_res$q25_CAGR,
+        q95_MaxDD = final_res$q95_MaxDD,
+        cagrs_all = final_res$cagrs_all,
+        maxdd_all = final_res$maxdd_all,
+        dd_depth_quantiles = final_res$dd_depth_quantiles,
+        avg_dd_duration = final_res$avg_dd_duration,
+        median_dd_duration = final_res$median_dd_duration,
+        max_dd_duration = final_res$max_dd_duration,
+        dd_duration_quantiles = final_res$dd_duration_quantiles,
+        psoptim_raw = opt
     )
 }
 
