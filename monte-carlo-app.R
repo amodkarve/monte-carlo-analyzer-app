@@ -7,6 +7,9 @@ library(ggplot2)
 library(plotly)
 library(shinyFiles)
 
+# Source ETF functions
+source("etf_functions.R")
+
 ##### CORE FUNCTIONS FROM ORIGINAL SCRIPT ####################################
 
 read_strategy_xts <- function(file, baseDir) {
@@ -49,10 +52,87 @@ build_unit_R <- function(baseDir, strategy_files, base_alloc, date_merge_method 
 
     list(
         unit_R = unit_R,
-        dates  = index(R_base_xts),
+        dates  = xts::index(R_base_xts),
         R_base = R_base
     )
 }
+
+# Build combined unit_R from both strategies and ETFs
+build_combined_unit_R <- function(baseDir,
+                                  strategy_files,
+                                  strategy_base_alloc,
+                                  etf_sma_symbols = NULL,
+                                  etf_buyhold_symbols = NULL,
+                                  etf_base_alloc = 0.05,
+                                  date_merge_method = "union") {
+    # Build strategy returns
+    strategy_result <- build_unit_R(baseDir, strategy_files, strategy_base_alloc, date_merge_method)
+    strategy_unit_R <- strategy_result$unit_R
+    strategy_dates <- strategy_result$dates
+
+    # Parse ETF symbols
+    sma_syms <- parse_symbols(etf_sma_symbols)
+    buyhold_syms <- parse_symbols(etf_buyhold_symbols)
+
+    # If no ETFs, return strategy results only
+    if (is.null(sma_syms) && is.null(buyhold_syms)) {
+        return(strategy_result)
+    }
+
+    # Determine date range from strategies
+    start_date <- min(strategy_dates)
+    end_date <- max(strategy_dates)
+
+    # Fetch and build ETF returns
+    etf_result <- build_etf_returns(
+        sma_symbols = sma_syms,
+        buyhold_symbols = buyhold_syms,
+        start_date = start_date,
+        end_date = end_date
+    )
+
+    # If ETF fetch failed, return strategy results only
+    if (is.null(etf_result)) {
+        warning("No ETF data could be fetched. Proceeding with strategies only.")
+        return(strategy_result)
+    }
+
+    etf_returns_xts <- etf_result$etf_returns_xts
+    etf_names <- etf_result$etf_names
+
+    # Convert strategy unit_R back to xts for merging
+    strategy_unit_R_xts <- xts(strategy_unit_R, order.by = strategy_dates)
+
+    # Merge strategy and ETF returns
+    if (date_merge_method == "intersection") {
+        combined_xts <- merge(strategy_unit_R_xts, etf_returns_xts, all = FALSE)
+    } else {
+        combined_xts <- merge(strategy_unit_R_xts, etf_returns_xts, all = TRUE)
+        combined_xts[is.na(combined_xts)] <- 0
+    }
+
+    # Convert back to matrix
+    combined_unit_R <- as.matrix(combined_xts)
+    rownames(combined_unit_R) <- NULL
+
+    # ETFs are already in return format (not scaled by allocation)
+    # So we need to convert them to unit returns by dividing by etf_base_alloc
+    n_strategies <- ncol(strategy_unit_R)
+    n_etfs <- length(etf_names)
+
+    if (n_etfs > 0) {
+        # Scale ETF returns to unit returns
+        etf_cols <- (n_strategies + 1):(n_strategies + n_etfs)
+        combined_unit_R[, etf_cols] <- combined_unit_R[, etf_cols] / etf_base_alloc
+    }
+
+    list(
+        unit_R = combined_unit_R,
+        dates = xts::index(combined_xts),
+        R_base = combined_unit_R * NA # Not used in optimization
+    )
+}
+
 
 precompute_indices <- function(n_hist, n_paths, n_days_sim, seed = NULL) {
     if (!is.null(seed)) set.seed(seed)
@@ -284,17 +364,41 @@ optimize_portfolio <- function(baseDir,
                                maxit = 80,
                                seed = 123,
                                date_merge_method = "union",
+                               etf_sma_symbols = NULL,
+                               etf_buyhold_symbols = NULL,
+                               etf_base_alloc = 0.05,
+                               etf_max_alloc = 0.15,
                                verbose = TRUE,
                                progress_callback = NULL) {
-    if (verbose) cat("Building unit_R...\n")
+    if (verbose) cat("Building unit_R with strategies and ETFs...\n")
     if (!is.null(progress_callback)) progress_callback("Building unit_R...")
 
-    prep <- build_unit_R(baseDir, strategy_files, base_alloc, date_merge_method)
+    prep <- build_combined_unit_R(
+        baseDir = baseDir,
+        strategy_files = strategy_files,
+        strategy_base_alloc = base_alloc,
+        etf_sma_symbols = etf_sma_symbols,
+        etf_buyhold_symbols = etf_buyhold_symbols,
+        etf_base_alloc = etf_base_alloc,
+        date_merge_method = date_merge_method
+    )
     unit_R <- prep$unit_R
 
     n_hist <- nrow(unit_R)
     n_strat <- ncol(unit_R)
-    stopifnot(length(max_alloc) == n_strat)
+
+    # Determine how many strategies vs ETFs we have
+    n_strategies <- length(base_alloc)
+    n_etfs <- n_strat - n_strategies
+
+    # Build combined max_alloc vector (strategies + ETFs)
+    if (n_etfs > 0) {
+        combined_max_alloc <- c(max_alloc, rep(etf_max_alloc, n_etfs))
+    } else {
+        combined_max_alloc <- max_alloc
+    }
+
+    stopifnot(length(combined_max_alloc) == n_strat)
 
     if (verbose) cat("Precomputing indices and sampled returns for optimization...\n")
     if (!is.null(progress_callback)) progress_callback("Precomputing indices...")
@@ -326,7 +430,7 @@ optimize_portfolio <- function(baseDir,
             trace = 0
         ),
         sampled_unit_R_list = sampled_opt,
-        max_alloc = max_alloc,
+        max_alloc = combined_max_alloc,
         total_max = total_max,
         dd_limit = dd_limit
     )
@@ -335,7 +439,7 @@ optimize_portfolio <- function(baseDir,
     if (!is.null(progress_callback)) progress_callback("Extracting best weights...")
 
     x_best <- pmax(pmin(opt$par, 1), 0)
-    w_best <- x_best * max_alloc
+    w_best <- x_best * combined_max_alloc
     if (sum(w_best) > total_max && sum(w_best) > 0) {
         w_best <- w_best * (total_max / sum(w_best))
     }
@@ -906,6 +1010,22 @@ ui <- fluidPage(
                             value = 123, min = 1, max = 10000, step = 1
                         ),
                         hr(),
+                        h4("ETF Integration"),
+                        textInput("etf_sma_symbols", "ETF Symbols (SMA 150 Conditional):",
+                            value = "", placeholder = "e.g., QQQ,SPY"
+                        ),
+                        helpText("Enter comma-separated symbols. These ETFs will only be held when price is above 150-day SMA."),
+                        textInput("etf_buyhold_symbols", "ETF Symbols (Buy and Hold):",
+                            value = "", placeholder = "e.g., GLD,TLT"
+                        ),
+                        helpText("Enter comma-separated symbols. These ETFs will be held continuously."),
+                        numericInput("etf_base_alloc", "ETF Base Allocation (each):",
+                            value = 0.05, min = 0.01, max = 1.0, step = 0.01
+                        ),
+                        numericInput("etf_max_alloc", "ETF Max Allocation (each):",
+                            value = 0.15, min = 0.01, max = 1.0, step = 0.01
+                        ),
+                        hr(),
                         h4("Date Handling"),
                         radioButtons(
                             "date_merge_method",
@@ -1405,6 +1525,10 @@ server <- function(input, output, session) {
                     maxit = input$maxit,
                     seed = input$seed,
                     date_merge_method = input$date_merge_method,
+                    etf_sma_symbols = input$etf_sma_symbols,
+                    etf_buyhold_symbols = input$etf_buyhold_symbols,
+                    etf_base_alloc = input$etf_base_alloc,
+                    etf_max_alloc = input$etf_max_alloc,
                     verbose = FALSE,
                     progress_callback = progress_callback
                 )
