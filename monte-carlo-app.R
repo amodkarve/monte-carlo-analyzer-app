@@ -65,20 +65,67 @@ build_combined_unit_R <- function(baseDir,
                                   etf_buyhold_symbols = NULL,
                                   etf_base_alloc = 0.05,
                                   date_merge_method = "union") {
+    # Parse ETF symbols
+    sma_syms <- parse_symbols(etf_sma_symbols)
+    buyhold_syms <- parse_symbols(etf_buyhold_symbols)
+
+    # Determine if we have strategies
+    has_strategies <- length(strategy_files) > 0
+    has_etfs <- !is.null(sma_syms) || !is.null(buyhold_syms)
+
+    # Must have at least one of strategies or ETFs
+    if (!has_strategies && !has_etfs) {
+        stop("Must provide either strategy files or ETF symbols")
+    }
+
+    # ETF-only mode
+    if (!has_strategies && has_etfs) {
+        # Determine date range - use a reasonable default or fetch from first ETF
+        # For simplicity, use last 5 years
+        end_date <- Sys.Date()
+        start_date <- end_date - (5 * 365)
+
+        # Fetch and build ETF returns
+        etf_result <- build_etf_returns(
+            sma_symbols = sma_syms,
+            buyhold_symbols = buyhold_syms,
+            start_date = start_date,
+            end_date = end_date
+        )
+
+        if (is.null(etf_result)) {
+            stop("Failed to fetch ETF data")
+        }
+
+        etf_returns_xts <- etf_result$etf_returns_xts
+        etf_names <- etf_result$etf_names
+
+        # Convert to matrix
+        etf_unit_R <- as.matrix(etf_returns_xts)
+        rownames(etf_unit_R) <- NULL
+
+        # Scale ETF returns to unit returns
+        etf_unit_R <- etf_unit_R / etf_base_alloc
+
+        return(list(
+            unit_R = etf_unit_R,
+            dates = xts::index(etf_returns_xts),
+            R_base = etf_unit_R * NA
+        ))
+    }
+
+    # Strategy-only or mixed mode
     # Build strategy returns
     strategy_result <- build_unit_R(baseDir, strategy_files, strategy_base_alloc, date_merge_method)
     strategy_unit_R <- strategy_result$unit_R
     strategy_dates <- strategy_result$dates
 
-    # Parse ETF symbols
-    sma_syms <- parse_symbols(etf_sma_symbols)
-    buyhold_syms <- parse_symbols(etf_buyhold_symbols)
-
     # If no ETFs, return strategy results only
-    if (is.null(sma_syms) && is.null(buyhold_syms)) {
+    if (!has_etfs) {
         return(strategy_result)
     }
 
+    # Mixed mode: strategies + ETFs
     # Determine date range from strategies
     start_date <- min(strategy_dates)
     end_date <- max(strategy_dates)
@@ -1485,20 +1532,30 @@ server <- function(input, output, session) {
     })
 
     observeEvent(input$runOptimization, {
-        req(input$selectedStrategies)
+        # Check if we have either strategies or ETFs
+        has_strategies <- !is.null(input$selectedStrategies) && length(input$selectedStrategies) > 0
+        has_etfs <- (!is.null(input$etf_sma_symbols) && input$etf_sma_symbols != "") ||
+            (!is.null(input$etf_buyhold_symbols) && input$etf_buyhold_symbols != "")
 
-        current_db <- db()
-        selected_db <- current_db[current_db$strategy_name %in% input$selectedStrategies, ]
-
-        if (nrow(selected_db) == 0) {
-            showNotification("Please select at least one strategy", type = "error")
+        if (!has_strategies && !has_etfs) {
+            showNotification("Please select at least one strategy or enter ETF symbols", type = "error")
             return()
         }
 
-        # Prepare inputs
-        strategy_files <- selected_db$file_path
-        base_alloc <- setNames(selected_db$base_alloc, selected_db$strategy_name)
-        max_alloc <- setNames(selected_db$max_alloc, selected_db$strategy_name)
+        current_db <- db()
+
+        # Prepare strategy inputs (may be empty for ETF-only mode)
+        if (has_strategies) {
+            selected_db <- current_db[current_db$strategy_name %in% input$selectedStrategies, ]
+            strategy_files <- selected_db$file_path
+            base_alloc <- setNames(selected_db$base_alloc, selected_db$strategy_name)
+            max_alloc <- setNames(selected_db$max_alloc, selected_db$strategy_name)
+        } else {
+            # ETF-only mode
+            strategy_files <- character(0)
+            base_alloc <- numeric(0)
+            max_alloc <- numeric(0)
+        }
 
         # Show progress
         progress <- Progress$new()
