@@ -63,7 +63,7 @@ build_combined_unit_R <- function(baseDir,
                                   strategy_base_alloc,
                                   etf_sma_symbols = NULL,
                                   etf_buyhold_symbols = NULL,
-                                  etf_base_alloc = 0.05,
+                                  etf_base_alloc = 1.0,
                                   date_merge_method = "union") {
     # Parse ETF symbols
     sma_syms <- parse_symbols(etf_sma_symbols)
@@ -413,7 +413,7 @@ optimize_portfolio <- function(baseDir,
                                date_merge_method = "union",
                                etf_sma_symbols = NULL,
                                etf_buyhold_symbols = NULL,
-                               etf_base_alloc = 0.05,
+                               etf_base_alloc = 1.0,
                                etf_max_alloc = 0.15,
                                verbose = TRUE,
                                progress_callback = NULL) {
@@ -1029,6 +1029,7 @@ ui <- fluidPage(
                     4,
                     wellPanel(
                         h4("Strategy Selection"),
+                        checkboxInput("selectAllStrategies", "Select All / None", value = FALSE),
                         uiOutput("strategyCheckboxes"),
                         hr(),
                         h4("Optimization Parameters"),
@@ -1066,9 +1067,6 @@ ui <- fluidPage(
                             value = "", placeholder = "e.g., GLD,TLT"
                         ),
                         helpText("Enter comma-separated symbols. These ETFs will be held continuously."),
-                        numericInput("etf_base_alloc", "ETF Base Allocation (each):",
-                            value = 0.05, min = 0.01, max = 1.0, step = 0.01
-                        ),
                         numericInput("etf_max_alloc", "ETF Max Allocation (each):",
                             value = 0.15, min = 0.01, max = 1.0, step = 0.01
                         ),
@@ -1511,6 +1509,28 @@ server <- function(input, output, session) {
         )
     })
 
+    # Handle select all/none checkbox
+    observeEvent(input$selectAllStrategies, {
+        req(db())
+        strategies <- db()$strategy_name
+
+        if (input$selectAllStrategies) {
+            # Select all strategies
+            updateCheckboxGroupInput(
+                session,
+                "selectedStrategies",
+                selected = strategies
+            )
+        } else {
+            # Deselect all strategies
+            updateCheckboxGroupInput(
+                session,
+                "selectedStrategies",
+                selected = character(0)
+            )
+        }
+    })
+
     # Generate strategy dropdown for single analysis
     output$singleStrategySelect <- renderUI({
         req(db())
@@ -1584,7 +1604,7 @@ server <- function(input, output, session) {
                     date_merge_method = input$date_merge_method,
                     etf_sma_symbols = input$etf_sma_symbols,
                     etf_buyhold_symbols = input$etf_buyhold_symbols,
-                    etf_base_alloc = input$etf_base_alloc,
+                    etf_base_alloc = 1.0,
                     etf_max_alloc = input$etf_max_alloc,
                     verbose = FALSE,
                     progress_callback = progress_callback
