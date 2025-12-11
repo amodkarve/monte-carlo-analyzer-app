@@ -1,0 +1,15 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# R specific
+.Rhistory
+.RData
+.Rproj.user
+*.Rproj
+
+# Temporary files
+*~
+*.swp
+*.swo

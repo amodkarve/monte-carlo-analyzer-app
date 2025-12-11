@@ -1,0 +1,8 @@
+"strategy_name","file_path","base_alloc","max_alloc"
+"Delta20_0DTE","20_Delta_0DTE.csv",0.04,0.1
+"Delta45_3PMIC","Delta45_3PMIC.csv",0.04,0.1
+"NTAsymetricRIC","NTAsymetricRIC.csv",0.05,0.1
+"Monday23DC","Monday23DC.csv",0.1,0.2
+"SPX_10_2_daily_put_diag","SPX_10_2_daily_put_diag.csv",0.1,0.2
+"SPX_0DTE_305_SL60","SPX_0DTE_305_SL60.csv",0.1,0.2
+"SPX_Uptrending_Put_Spread","SPX_Uptrending_Put_Spread.csv",0.05,0.3
