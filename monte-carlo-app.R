@@ -1640,7 +1640,7 @@ server <- function(input, output, session) {
         cat(sprintf("  99th percentile: %.2f%%\n\n", result$dd_depth_quantiles[5] * 100))
 
         cat("Drawdown Duration:\n")
-        if (!is.na(result$avg_dd_duration)) {
+        if (!is.null(result$avg_dd_duration) && length(result$avg_dd_duration) > 0 && !is.na(result$avg_dd_duration)) {
             cat(sprintf("  Average: %.1f days\n", result$avg_dd_duration))
             cat(sprintf("  Median: %.1f days\n", result$median_dd_duration))
             cat(sprintf("  Maximum: %.0f days\n\n", result$max_dd_duration))
