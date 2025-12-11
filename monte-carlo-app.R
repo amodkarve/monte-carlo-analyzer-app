@@ -52,7 +52,7 @@ build_unit_R <- function(baseDir, strategy_files, base_alloc, date_merge_method 
 
     list(
         unit_R = unit_R,
-        dates  = xts::index(R_base_xts),
+        dates  = zoo::index(R_base_xts),
         R_base = R_base
     )
 }
@@ -109,7 +109,7 @@ build_combined_unit_R <- function(baseDir,
 
         return(list(
             unit_R = etf_unit_R,
-            dates = xts::index(etf_returns_xts),
+            dates = zoo::index(etf_returns_xts),
             R_base = etf_unit_R * NA
         ))
     }
@@ -175,7 +175,7 @@ build_combined_unit_R <- function(baseDir,
 
     list(
         unit_R = combined_unit_R,
-        dates = xts::index(combined_xts),
+        dates = zoo::index(combined_xts),
         R_base = combined_unit_R * NA # Not used in optimization
     )
 }

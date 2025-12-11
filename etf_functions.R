@@ -107,7 +107,7 @@ build_etf_returns <- function(sma_symbols = NULL,
             filtered_prices <- apply_sma_filter(as.numeric(prices), sma)
 
             # Convert to xts with original dates
-            filtered_prices_xts <- xts(filtered_prices, order.by = xts::index(prices))
+            filtered_prices_xts <- xts(filtered_prices, order.by = zoo::index(prices))
 
             # Convert to returns
             returns <- prices_to_returns(filtered_prices_xts)
