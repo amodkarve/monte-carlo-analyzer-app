@@ -233,11 +233,11 @@ run_portfolio_mc_from_sampled <- function(sampled_list,
     cagrs <- end_equity^(1 / years) - 1
 
     # 4) Quantiles
-    q25_cagr <- quantile(cagrs, 0.25)
-    q95_maxdd <- quantile(max_dd, 0.05)
+    q25_cagr <- quantile(cagrs, 0.25, na.rm = TRUE)
+    q95_maxdd <- quantile(max_dd, 0.05, na.rm = TRUE)
 
     # 5) Drawdown depth at multiple confidence levels
-    dd_quantiles <- quantile(max_dd, c(0.50, 0.75, 0.90, 0.95, 0.99))
+    dd_quantiles <- quantile(max_dd, c(0.50, 0.75, 0.90, 0.95, 0.99), na.rm = TRUE)
 
     # 6) Drawdown duration statistics
     # For each path, find all drawdown periods and their durations
@@ -258,10 +258,10 @@ run_portfolio_mc_from_sampled <- function(sampled_list,
 
     # Calculate duration statistics
     if (length(all_dd_durations) > 0) {
-        avg_dd_duration <- mean(all_dd_durations)
-        median_dd_duration <- median(all_dd_durations)
-        max_dd_duration <- max(all_dd_durations)
-        dd_duration_quantiles <- quantile(all_dd_durations, c(0.50, 0.75, 0.90, 0.95, 0.99))
+        avg_dd_duration <- mean(all_dd_durations, na.rm = TRUE)
+        median_dd_duration <- median(all_dd_durations, na.rm = TRUE)
+        max_dd_duration <- max(all_dd_durations, na.rm = TRUE)
+        dd_duration_quantiles <- quantile(all_dd_durations, c(0.50, 0.75, 0.90, 0.95, 0.99), na.rm = TRUE)
     } else {
         avg_dd_duration <- NA
         median_dd_duration <- NA
@@ -316,11 +316,11 @@ run_portfolio_mc <- function(unit_R,
     cagrs <- end_equity^(1 / years) - 1
 
     # 5) Quantiles
-    q25_cagr <- quantile(cagrs, 0.25)
-    q95_maxdd <- quantile(max_dd, 0.05)
+    q25_cagr <- quantile(cagrs, 0.25, na.rm = TRUE)
+    q95_maxdd <- quantile(max_dd, 0.05, na.rm = TRUE)
 
     # 6) Drawdown depth at multiple confidence levels
-    dd_quantiles <- quantile(max_dd, c(0.50, 0.75, 0.90, 0.95, 0.99))
+    dd_quantiles <- quantile(max_dd, c(0.50, 0.75, 0.90, 0.95, 0.99), na.rm = TRUE)
 
     # 7) Drawdown duration statistics
     all_dd_durations <- numeric()
@@ -340,10 +340,10 @@ run_portfolio_mc <- function(unit_R,
 
     # Calculate duration statistics
     if (length(all_dd_durations) > 0) {
-        avg_dd_duration <- mean(all_dd_durations)
-        median_dd_duration <- median(all_dd_durations)
-        max_dd_duration <- max(all_dd_durations)
-        dd_duration_quantiles <- quantile(all_dd_durations, c(0.50, 0.75, 0.90, 0.95, 0.99))
+        avg_dd_duration <- mean(all_dd_durations, na.rm = TRUE)
+        median_dd_duration <- median(all_dd_durations, na.rm = TRUE)
+        max_dd_duration <- max(all_dd_durations, na.rm = TRUE)
+        dd_duration_quantiles <- quantile(all_dd_durations, c(0.50, 0.75, 0.90, 0.95, 0.99), na.rm = TRUE)
     } else {
         avg_dd_duration <- NA
         median_dd_duration <- NA
