@@ -691,8 +691,8 @@ analyze_time_periods <- function(returns, dates, n_periods = 4) {
         years <- length(period_returns) / 252
         cagr <- (equity[length(equity)]^(1 / years)) - 1
 
-        sharpe <- if (sd(period_returns) > 0) {
-            mean(period_returns) / sd(period_returns) * sqrt(252)
+        sharpe <- if (sd(period_returns, na.rm = TRUE) > 0) {
+            mean(period_returns, na.rm = TRUE) / sd(period_returns, na.rm = TRUE) * sqrt(252)
         } else {
             NA
         }
@@ -717,7 +717,7 @@ analyze_time_periods <- function(returns, dates, n_periods = 4) {
     }
 
     # Calculate coefficient of variation for each metric
-    cv_cagr <- sd(results$cagr) / abs(mean(results$cagr))
+    cv_cagr <- sd(results$cagr, na.rm = TRUE) / abs(mean(results$cagr, na.rm = TRUE))
     cv_sharpe <- sd(results$sharpe, na.rm = TRUE) / abs(mean(results$sharpe, na.rm = TRUE))
 
     list(
@@ -773,12 +773,12 @@ walk_forward_test <- function(returns, dates, train_pct = 0.7, n_folds = 5) {
         ))
     }
 
-    avg_degradation <- mean(results$degradation)
+    avg_degradation <- mean(results$degradation, na.rm = TRUE)
 
     list(
         fold_results = results,
         avg_degradation = avg_degradation,
-        oos_ratio = mean(results$test_cagr) / mean(results$train_cagr)
+        oos_ratio = mean(results$test_cagr, na.rm = TRUE) / mean(results$train_cagr, na.rm = TRUE)
     )
 }
 
@@ -802,8 +802,8 @@ calculate_rolling_metrics <- function(returns, dates, window = 252) {
         window_date <- dates[i]
 
         # Sharpe
-        sharpe <- if (sd(window_returns) > 0) {
-            mean(window_returns) / sd(window_returns) * sqrt(252)
+        sharpe <- if (sd(window_returns, na.rm = TRUE) > 0) {
+            mean(window_returns, na.rm = TRUE) / sd(window_returns, na.rm = TRUE) * sqrt(252)
         } else {
             NA
         }
@@ -862,9 +862,9 @@ analyze_drawdowns <- function(returns, dates) {
 
     list(
         n_drawdowns = nrow(dd_details),
-        avg_duration = mean(dd_details$duration),
-        avg_depth = mean(dd_details$depth),
-        max_depth = min(dd_details$depth),
+        avg_duration = mean(dd_details$duration, na.rm = TRUE),
+        avg_depth = mean(dd_details$depth, na.rm = TRUE),
+        max_depth = min(dd_details$depth, na.rm = TRUE),
         drawdown_details = dd_details
     )
 }
@@ -873,7 +873,7 @@ analyze_drawdowns <- function(returns, dates) {
 run_statistical_tests <- function(returns) {
     # Normality tests
     ks_test <- tryCatch(
-        ks.test(returns, "pnorm", mean(returns), sd(returns)),
+        ks.test(returns, "pnorm", mean(returns, na.rm = TRUE), sd(returns, na.rm = TRUE)),
         error = function(e) list(p.value = NA)
     )
 
@@ -920,8 +920,8 @@ bootstrap_metrics <- function(returns, n_bootstrap = 1000) {
         cagr_boot[i] <- (equity[length(equity)]^(1 / years)) - 1
 
         # Sharpe
-        sharpe_boot[i] <- if (sd(boot_returns) > 0) {
-            mean(boot_returns) / sd(boot_returns) * sqrt(252)
+        sharpe_boot[i] <- if (sd(boot_returns, na.rm = TRUE) > 0) {
+            mean(boot_returns, na.rm = TRUE) / sd(boot_returns, na.rm = TRUE) * sqrt(252)
         } else {
             NA
         }

@@ -67,8 +67,12 @@ prices_to_returns <- function(prices) {
     # Remove the first NA from diff
     returns <- returns[-1]
 
-    # Replace NA returns with 0 (no position)
-    returns[is.na(returns)] <- 0
+    # Replace NA and NaN returns with 0 (no position)
+    # This handles both NA and NaN values that can occur from division
+    returns[is.na(returns) | is.nan(returns)] <- 0
+
+    # Also handle Inf values that might occur from division by zero
+    returns[is.infinite(returns)] <- 0
 
     returns
 }
